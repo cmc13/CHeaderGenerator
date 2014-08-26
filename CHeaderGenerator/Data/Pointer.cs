@@ -5,7 +5,6 @@ using System.Text;
 
 namespace CHeaderGenerator.Data
 {
-
     public class Pointer : IEquatable<Pointer>
     {
         public Pointer InnerPointer { get; set; }
@@ -13,12 +12,12 @@ namespace CHeaderGenerator.Data
 
         public override string ToString()
         {
-            StringBuilder str = new StringBuilder();
+            var str = new StringBuilder();
 
-            if (InnerPointer != null)
-                str.Append(InnerPointer);
+            if (this.InnerPointer != null)
+                str.Append(this.InnerPointer);
 
-            string tqString = TypeQualifier.GetTypeQualifierString(TypeQualifiers);
+            string tqString = TypeQualifier.GetTypeQualifierString(this.TypeQualifiers);
             if (!string.IsNullOrEmpty(tqString))
             {
                 if (str.Length > 0)

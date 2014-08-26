@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace CHeaderGenerator.Data
 {
-    public class Declaration : IEquatable<Declaration>
+    public class Declaration : BaseDeclaration<Declarator>, IEquatable<Declaration>
     {
         public Declaration()
         {
@@ -15,7 +15,14 @@ namespace CHeaderGenerator.Data
         }
 
         public DeclarationSpecifiers DeclarationSpecifiers { get; set; }
-        public Declarator Declarator { get; set; }
+        public override IEnumerable<string> Modifiers
+        {
+            get { return this.DeclarationSpecifiers.Modifiers; }
+        }
+        public override TypeSpecifier TypeSpecifier
+        {
+            get { return this.DeclarationSpecifiers.TypeSpecifier; }
+        }
         public IReadOnlyCollection<string> IfStack { get; internal set; }
 
         public IEnumerable<string> GetNeededDefinitions()
@@ -100,25 +107,6 @@ namespace CHeaderGenerator.Data
                 return false;
 
             return true;
-        }
-
-        public IEnumerable<string> GetDependencies()
-        {
-            if (this.DeclarationSpecifiers.TypeSpecifier != null)
-            {
-                foreach (var dep in this.DeclarationSpecifiers.TypeSpecifier.GetDependencies())
-                    yield return dep;
-            }
-
-            foreach (var mod in DeclarationSpecifiers.Modifiers)
-                yield return mod;
-
-            if (this.Declarator != null)
-            {
-                var dependencies = this.Declarator.GetDependencies();
-                foreach (var d in dependencies)
-                    yield return d;
-            }
         }
 
         private void WriteDependencies(TextWriter writer, List<DeclMarker> declList,

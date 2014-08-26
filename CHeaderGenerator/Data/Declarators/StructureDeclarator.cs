@@ -18,19 +18,19 @@ namespace CHeaderGenerator.Data
 
         public override string ToString()
         {
-            StringBuilder str = new StringBuilder();
+            var str = new StringBuilder();
 
-            if (SpecifierQualifierList != null)
-                str.Append(SpecifierQualifierList);
+            if (this.SpecifierQualifierList != null)
+                str.Append(this.SpecifierQualifierList);
 
-            if (Declarator != null)
+            if (this.Declarator != null)
             {
                 if (str.Length > 0)
                     str.Append(' ');
-                str.Append(Declarator);
+                str.Append(this.Declarator);
 
-                if (!string.IsNullOrEmpty(ConstantExpression))
-                    str.Append(" : ").Append(ConstantExpression);
+                if (!string.IsNullOrEmpty(this.ConstantExpression))
+                    str.Append(" : ").Append(this.ConstantExpression);
             }
 
             return str.ToString();

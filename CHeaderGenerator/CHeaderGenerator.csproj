@@ -220,6 +220,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CodeWriter\CHeaderFileWriter.cs" />
+    <Compile Include="Data\Declaration\BaseDeclaration.cs" />
+    <Compile Include="Data\Declarators\ArrayDeclarator.cs" />
+    <Compile Include="Data\Declarators\FunctionDeclarator.cs" />
+    <Compile Include="Data\Declarators\ParenthesizedDeclarator.cs" />
     <Compile Include="Data\Helpers\DeclMarker.cs" />
     <Compile Include="Data\Helpers\IfStackWriter.cs" />
     <Compile Include="Data\Helpers\IncludeGuardWriter.cs" />
@@ -229,11 +233,11 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="Data\DeclarationSpecifiers.cs" />
-    <Compile Include="Data\DirectDeclarator.cs" />
-    <Compile Include="Data\EnumSpecifier.cs" />
-    <Compile Include="Data\ParameterDeclaration.cs" />
+    <Compile Include="Data\Declarators\DirectDeclarator.cs" />
+    <Compile Include="Data\TypeSpecifiers\EnumSpecifier.cs" />
+    <Compile Include="Data\Declaration\ParameterDeclaration.cs" />
     <Compile Include="Data\Pointer.cs" />
-    <Compile Include="Data\StructureSpecifier.cs" />
+    <Compile Include="Data\TypeSpecifiers\StructureSpecifier.cs" />
     <Compile Include="Data\Utilities.cs" />
     <Compile Include="Extensions\MiscExtensions.cs" />
     <Compile Include="Extensions\StringExtensions.cs" />
@@ -253,19 +257,19 @@
     <Compile Include="Parser\C\CToken.cs" />
     <Compile Include="Parser\C\CTokenizer.cs" />
     <Compile Include="Parser\C\CTokenType.cs" />
-    <Compile Include="Data\Declaration.cs" />
-    <Compile Include="Data\Declarator.cs" />
+    <Compile Include="Data\Declaration\Declaration.cs" />
+    <Compile Include="Data\Declarators\Declarator.cs" />
     <Compile Include="Data\Definition.cs" />
     <Compile Include="Data\Enumerator.cs" />
     <Compile Include="Parser\InvalidTokenException.cs" />
     <Compile Include="Parser\IScanner.cs" />
     <Compile Include="Parser\ITokenizer.cs" />
     <Compile Include="Parser\Scanner.cs" />
-    <Compile Include="Data\StructureDeclarator.cs" />
+    <Compile Include="Data\Declarators\StructureDeclarator.cs" />
     <Compile Include="Parser\Token.cs" />
     <Compile Include="Parser\Tokenizer.cs" />
     <Compile Include="Parser\TokenType.cs" />
-    <Compile Include="Data\TypeSpecifier.cs" />
+    <Compile Include="Data\TypeSpecifiers\TypeSpecifier.cs" />
     <Compile Include="Parser\UnexpectedCharEncounteredException.cs" />
     <Compile Include="Resources.Designer.cs">
       <AutoGen>True</AutoGen>
