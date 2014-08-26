@@ -73,6 +73,7 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="CodeWriter\CHeaderFileWriterTests.cs" />
     <Compile Include="Parser\C\CLexerTest.cs" />
     <Compile Include="Parser\C\CParserFactoryTest.cs" />
     <Compile Include="Parser\C\CParserTest.cs" />
