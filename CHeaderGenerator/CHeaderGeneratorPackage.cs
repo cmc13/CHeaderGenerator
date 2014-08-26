@@ -59,6 +59,7 @@ namespace CHeaderGenerator
         private ICParserFactory parserFactory = null;
 
         private static readonly Logger log = LogManager.GetCurrentClassLogger();
+        private static DTE2 applicationObject = null;
 
         #endregion
 
@@ -83,6 +84,20 @@ namespace CHeaderGenerator
 
         #endregion
 
+        #region Public Property Definitions
+
+        private static DTE2 ApplicationObject
+        {
+            get
+            {
+                if (applicationObject == null)
+                    applicationObject = (DTE2)Package.GetGlobalService(typeof(SDTE));
+                return applicationObject;
+            }
+        }
+
+        #endregion
+
         /////////////////////////////////////////////////////////////////////////////
         // Overridden Package Implementation
         #region Package Members
@@ -101,7 +116,7 @@ namespace CHeaderGenerator
             var mcs = GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
             if (null != mcs)
             {
-                // Create the command for the menu item.
+                // Create the command for the menu item on the solution explorer.
                 var menuCommandID = new CommandID(GuidList.SolutionExplorerCmdSet, (int)PkgCmdIDList.cmdidGenerateCHeader);
                 var menuItem = new OleMenuCommand(this.GenerateCHeaderMenuItemCallback, menuCommandID);
                 menuItem.Visible = true;
@@ -113,10 +128,9 @@ namespace CHeaderGenerator
                     {
                         item.Visible = true;
 
-                        var applicationObject = (DTE2)Package.GetGlobalService(typeof(SDTE));
-                        var solutionExplorer = applicationObject.ToolWindows.SolutionExplorer;
+                        var solutionExplorer = ApplicationObject.ToolWindows.SolutionExplorer;
                         var selectedItems = solutionExplorer.SelectedItems as IEnumerable<UIHierarchyItem>;
-                        foreach (var projectItem in GetProjectItems(selectedItems))
+                        foreach (var projectItem in selectedItems.GetProjectItems())
                         {
                             if (projectItem.Kind != EnvDTE.Constants.vsProjectItemKindPhysicalFile
                                 || !Path.GetExtension(projectItem.FileNames[0]).Equals(".c", StringComparison.CurrentCultureIgnoreCase))
@@ -128,6 +142,7 @@ namespace CHeaderGenerator
                     }
                 };
 
+                // Create the command for the menu item on the current document.
                 menuCommandID = new CommandID(GuidList.CurrentDocumentCmdSet, (int)PkgCmdIDList.cmdidGenerateCHeaderCurrentDoc);
                 menuItem = new OleMenuCommand(this.GenerateCHeaderCurrentDocMenuItemCallback, menuCommandID);
                 menuItem.Visible = true;
@@ -138,8 +153,7 @@ namespace CHeaderGenerator
                     if (item != null)
                     {
                         item.Visible = true;
-                        var applicationObject = (DTE2)Package.GetGlobalService(typeof(SDTE));
-                        var pItem = applicationObject.ActiveDocument.ProjectItem;
+                        var pItem = ApplicationObject.ActiveDocument.ProjectItem;
                         if (!Path.GetExtension(pItem.Properties.Item("FullPath").Value.ToString()).Equals(".c", StringComparison.CurrentCultureIgnoreCase))
                             item.Visible = false;
                     }
@@ -152,35 +166,34 @@ namespace CHeaderGenerator
         #region Callbacks
 
         /// <summary>
-        /// This function is the callback used to execute a command when the a menu item is clicked.
-        /// See the Initialize method to see how the menu item is associated to this function using
-        /// the OleMenuCommandService service and the MenuCommand class.
+        /// This callback is used when a user selected one or more files from the solution explorer
+        /// and clicks the Generate C Header menu item from the context menu.
         /// </summary>
         private void GenerateCHeaderMenuItemCallback(object sender, EventArgs e)
         {
-            var applicationObject = Package.GetGlobalService(typeof(SDTE)) as DTE2;
-            var selectedItems = applicationObject.ToolWindows.SolutionExplorer.SelectedItems
-                as IReadOnlyCollection<UIHierarchyItem>;
-            var projectItems = new List<ProjectItem>(GetProjectItems(selectedItems));
+            var selectedItems = ApplicationObject.ToolWindows.SolutionExplorer.SelectedItems
+                as IEnumerable<UIHierarchyItem>;
+            var projectItems = new List<ProjectItem>(selectedItems.GetProjectItems());
 
-            ProcessFiles(applicationObject, projectItems);
+            this.ProcessFiles(projectItems);
         }
 
+        /// <summary>
+        /// This callback is used when a user right clicks an open document and clicks the
+        /// Generate C Header menu item from the context menu.
+        /// </summary>
         private void GenerateCHeaderCurrentDocMenuItemCallback(object sender, EventArgs e)
         {
-            var applicationObject = Package.GetGlobalService(typeof(SDTE)) as DTE2;
-            var projectItem = applicationObject.ActiveDocument.ProjectItem;
-
-            var projectItemList = new List<ProjectItem>();
-            projectItemList.Add(projectItem);
-
-            ProcessFiles(applicationObject, projectItemList);
+            this.ProcessFiles(ApplicationObject.ActiveDocument.ProjectItem.ToList());
         }
 
         #endregion
 
         #region Private Method Definitions
 
+        /// <summary>
+        /// Initialize the NLog output window target.
+        /// </summary>
         private void InitializeLogging()
         {
             using (var options = GetDialogPage(typeof(CSourceFileOptions)) as CSourceFileOptions)
@@ -201,7 +214,11 @@ namespace CHeaderGenerator
             }
         }
 
-        private void ProcessFiles(DTE2 applicationObject, IReadOnlyCollection<ProjectItem> projectItems)
+        /// <summary>
+        /// Generate C header files for a list of project items.
+        /// </summary>
+        /// <param name="projectItems">A list of project items.</param>
+        private void ProcessFiles(IReadOnlyCollection<ProjectItem> projectItems)
         {
             bool showIncludeGuard;
             bool autoSaveFiles;
@@ -217,6 +234,7 @@ namespace CHeaderGenerator
                 autoSaveFiles = options.AutoSaveFiles;
             }
 
+            // Initialize viewmodel to keep track of progress
             using (var progressVM = new ProgressViewModel
                 {
                     Minimum = 0.0,
@@ -230,7 +248,7 @@ namespace CHeaderGenerator
                 int i = 0;
                 foreach (var projectItem in projectItems)
                 {
-                    if (projectItem.Document != null &&!projectItem.Document.Saved && autoSaveFiles)
+                    if (projectItem.Document != null && !projectItem.Document.Saved && autoSaveFiles)
                         projectItem.Document.Save();
 
                     string file = projectItem.FileNames[0];
@@ -239,16 +257,17 @@ namespace CHeaderGenerator
 
                     try
                     {
-                        i++;
-                        log.Info("Processing {0}/{1}: {2}", i, projectItems.Count, file);
+                        // Parse the file
+                        log.Info("Processing {0}/{1}: {2}", ++i, projectItems.Count, file);
                         progressVM.Message = string.Format("{0}/{1}: Processing {2}", i, projectItems.Count, file);
-                        if (!ParseItem(applicationObject, file, itemToAdd, codeWriter, showIncludeGuard, projectItem))
+                        if (!ParseItem(file, itemToAdd, codeWriter, showIncludeGuard, projectItem))
                             break;
                         progressVM.ProgressValue = Convert.ToDouble(i);
                     }
                     catch (ParserException tex)
                     {
-                        var window = applicationObject.ItemOperations.OpenFile(file);
+                        // Go to file/line where the error occurred and display a dialog with the error message.
+                        var window = ApplicationObject.ItemOperations.OpenFile(file);
                         window.Activate();
                         if (tex.LineNumber > 0)
                         {
@@ -262,12 +281,14 @@ namespace CHeaderGenerator
                     }
                     catch (Exception ex)
                     {
+                        // Show a dialog with a less-than-helpful exception message.
                         log.Error(string.Format("Unknown error while parsing file: {0}", file), ex);
                         this.ShowExceptionDialog(ex, string.Format("Unknown exception while parsing: {0}", file));
                         error = true;
                     }
                     finally
                     {
+                        // Log the result of the parse operation.
                         var messageBuilder = new System.Text.StringBuilder();
                         messageBuilder.AppendFormat("Completed processing file {0}/{1}: {2}.", i, projectItems.Count, file);
                         if (error)
@@ -280,20 +301,23 @@ namespace CHeaderGenerator
             }
         }
 
-        private static IEnumerable<ProjectItem> GetProjectItems(IEnumerable<UIHierarchyItem> hItems)
-        {
-            foreach (var hItem in hItems)
-                yield return hItem.Object as ProjectItem;
-        }
-
-        private bool ParseItem(DTE2 applicationObject, string fileName, string itemToAdd,
+        /// <summary>
+        /// Parse a C file and write a header files from the parsed contents.
+        /// </summary>
+        /// <param name="sourceFileName">The source file to parse</param>
+        /// <param name="headerFileName">The header file to write</param>
+        /// <param name="codeWriter">Code writer object</param>
+        /// <param name="showIncludeGuard">Whether to surround the header file in an include guard</param>
+        /// <param name="projectItem">The project item corresponding to the source file</param>
+        /// <returns></returns>
+        private bool ParseItem(string sourceFileName, string headerFileName,
             CHeaderFileWriter codeWriter, bool showIncludeGuard, ProjectItem projectItem)
         {
             var containingProject = projectItem.ContainingProject;
-            var existingItem = FindExistingItem(itemToAdd, containingProject);
+            var existingItem = containingProject.FindExistingItem(headerFileName);
             if (existingItem != null)
             {
-                var message = string.Format("File {0} already exists, would you like to re-generate the header file?", itemToAdd);
+                var message = string.Format("File {0} already exists, would you like to re-generate the header file?", headerFileName);
                 var result = this.dlgService.ShowYesNoCancelDialog(message,
                     "File Exists");
                 if (result == System.Windows.MessageBoxResult.No)
@@ -303,16 +327,16 @@ namespace CHeaderGenerator
             }
 
             if (existingItem != null)
-                CheckOutFile(applicationObject.SourceControl, itemToAdd);
+                CheckOutFile(ApplicationObject.SourceControl, headerFileName);
 
-            var c = this.ParseFile(fileName);
+            var c = this.ParseSourceFile(sourceFileName);
 
-            WriteToFile(showIncludeGuard, codeWriter, itemToAdd, c);
+            WriteToHeaderFile(showIncludeGuard, codeWriter, headerFileName, c);
 
             // Add File to Project
             if (existingItem == null)
             {
-                containingProject.ProjectItems.AddFromFile(itemToAdd);
+                containingProject.ProjectItems.AddFromFile(headerFileName);
                 if (!containingProject.Saved)
                     containingProject.Save();
             }
@@ -340,14 +364,24 @@ namespace CHeaderGenerator
             thread.Start();
         }
 
-        private static string GetItemFileName(string fileName)
+        /// <summary>
+        /// Get header file name from source file name
+        /// </summary>
+        /// <param name="sourceFileName">The name of the source file</param>
+        /// <returns>The corresponding header file name</returns>
+        private static string GetItemFileName(string sourceFileName)
         {
-            string extension = Path.GetFileName(fileName).IsUpper() ? ".H" : ".h";
+            string extension = Path.GetFileName(sourceFileName).IsUpper() ? ".H" : ".h";
 
-            return Path.Combine(Path.GetDirectoryName(fileName),
-                Path.GetFileNameWithoutExtension(fileName) + extension);
+            return Path.Combine(Path.GetDirectoryName(sourceFileName),
+                Path.GetFileNameWithoutExtension(sourceFileName) + extension);
         }
 
+        /// <summary>
+        /// Check out file from source control.
+        /// </summary>
+        /// <param name="sourceControl">Source control object</param>
+        /// <param name="file">The name of the file to check out</param>
         private static void CheckOutFile(SourceControl sourceControl, string file)
         {
             if (sourceControl != null && sourceControl.IsItemUnderSCC(file)
@@ -357,40 +391,45 @@ namespace CHeaderGenerator
             }
         }
 
-        private static void WriteToFile(bool showIncludeGuard, CHeaderFileWriter codeWriter, string itemToAdd, CSourceFile c)
+        /// <summary>
+        /// Writer the parsed source file to the output file
+        /// </summary>
+        /// <param name="showIncludeGuard">Whether to surround the header file in an include guard</param>
+        /// <param name="codeWriter">The code writer object</param>
+        /// <param name="headerFileName">The name of the header file to produce</param>
+        /// <param name="c">The parse source file</param>
+        private static void WriteToHeaderFile(bool showIncludeGuard, CHeaderFileWriter codeWriter, string headerFileName, CSourceFile c)
         {
             if (showIncludeGuard)
                 codeWriter.IncludeGuard = new Regex(@"[^A-Z0-9_]").Replace(string.Format("__{0}__",
-                    Path.GetFileName(itemToAdd).ToUpperInvariant()), "_");
+                    Path.GetFileName(headerFileName).ToUpperInvariant()), "_");
             else
                 codeWriter.IncludeGuard = null;
 
-            using (var stream = File.Open(itemToAdd, FileMode.Create))
+            using (var stream = File.Open(headerFileName, FileMode.Create))
             {
                 codeWriter.WriteHeaderFile(c, stream);
             }
         }
 
-        private CSourceFile ParseFile(string fileName)
+        /// <summary>
+        /// Parse the given source file
+        /// </summary>
+        /// <param name="fileName">The name of the source file</param>
+        /// <returns>A parsed C file</returns>
+        private CSourceFile ParseSourceFile(string fileName)
         {
             using (var stream = File.OpenRead(fileName))
             {
-                return parserFactory.CreateParser(stream).PerformParse();
+                return this.parserFactory.CreateParser(stream).PerformParse();
             }
         }
 
-        private static ProjectItem FindExistingItem(string itemToAdd, Project containingProject)
-        {
-            string localFile = Path.GetFileName(itemToAdd);
-            foreach (ProjectItem item in containingProject.ProjectItems)
-            {
-                if (item.Name.Equals(localFile, StringComparison.CurrentCultureIgnoreCase))
-                    return item;
-            }
-
-            return null;
-        }
-
+        /// <summary>
+        /// Generate a header comment using the given template, replacing common tokens.
+        /// </summary>
+        /// <param name="template">The template</param>
+        /// <returns>The header comment with tokens replaced by the user's name, company, and date.</returns>
         private static string SetHeaderComment(string template)
         {
             string headerComment = null;
@@ -405,12 +444,20 @@ namespace CHeaderGenerator
             return headerComment;
         }
 
+        /// <summary>
+        /// Gets the company name of the executing assembly.
+        /// </summary>
+        /// <returns>The company name</returns>
         private static string GetCompanyName()
         {
             return ((AssemblyCompanyAttribute)Attribute.GetCustomAttribute(Assembly.GetExecutingAssembly(), typeof(AssemblyCompanyAttribute), false))
                 .Company;
         }
 
+        /// <summary>
+        /// Gets the current user's name
+        /// </summary>
+        /// <returns>The current user's name</returns>
         private static string GetUserName()
         {
             return UserPrincipal.Current.DisplayName;

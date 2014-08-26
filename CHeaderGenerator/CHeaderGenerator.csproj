@@ -235,6 +235,7 @@
     <Compile Include="Data\Pointer.cs" />
     <Compile Include="Data\StructureSpecifier.cs" />
     <Compile Include="Data\Utilities.cs" />
+    <Compile Include="Extensions\MiscExtensions.cs" />
     <Compile Include="Extensions\StringExtensions.cs" />
     <Compile Include="Guids.cs" />
     <Compile Include="LogLevel.cs" />
