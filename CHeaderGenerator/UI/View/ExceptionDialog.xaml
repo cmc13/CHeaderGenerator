@@ -1,0 +1,26 @@
+﻿<Window x:Class="CHeaderGenerator.UI.View.ExceptionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:dlg="clr-namespace:CHeaderGenerator.UI"
+        Title="{Binding Caption}" SizeToContent="Height" Width="400" WindowStyle="ToolWindow"
+        dlg:DialogCloser.DialogResult="{Binding DialogResult}">
+    <Window.Resources>
+        <dlg:ExceptionConverter x:Key="ExceptionConverter" />
+    </Window.Resources>
+    <StackPanel>
+        <TextBlock Margin="5" Text="{Binding Message}" TextWrapping="Wrap" />
+        <Expander Header="Expand" Margin="5">
+            <Expander.Style>
+                <Style TargetType="Expander">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsExpanded, RelativeSource={RelativeSource Self}}">
+                            <Setter Property="Header" Value="Collapse" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Expander.Style>
+            <TextBox Height="300" Text="{Binding Exception, Converter={StaticResource ExceptionConverter}}" TextWrapping="Wrap" />
+        </Expander>
+        <Button IsDefault="True" Content="OK" Width="75" Margin="5" Command="{Binding OKCommand}" />
+    </StackPanel>
+</Window>
