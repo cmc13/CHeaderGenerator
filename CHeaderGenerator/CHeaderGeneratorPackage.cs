@@ -256,13 +256,13 @@ namespace CHeaderGenerator
                             if (textSelection != null)
                                 textSelection.GotoLine(tex.LineNumber, true);
                         }
-                        log.ErrorException(string.Format("Failed to parse file: {0}", file), tex);
+                        log.Error(string.Format("Failed to parse file: {0}", file), tex);
                         this.ShowExceptionDialog(tex, string.Format("Failed to parse file: {0}", file));
                         error = true;
                     }
                     catch (Exception ex)
                     {
-                        log.ErrorException(string.Format("Unknown error while parsing file: {0}", file), ex);
+                        log.Error(string.Format("Unknown error while parsing file: {0}", file), ex);
                         this.ShowExceptionDialog(ex, string.Format("Unknown exception while parsing: {0}", file));
                         error = true;
                     }
