@@ -230,6 +230,7 @@ namespace CHeaderGenerator
             {
                 codeWriter.IncludeStaticFunctions = options.IncludeStaticFunctions;
                 codeWriter.IncludeExternFunctions = options.IncludeExternFunctions;
+                codeWriter.HeaderCommentPlacement = options.HeaderCommentPlacement;
                 showIncludeGuard = options.ShowIncludeGuard;
                 autoSaveFiles = options.AutoSaveFiles;
                 baseHeaderComment = ProcessHeaderCommentCommonTokens(options);

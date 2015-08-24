@@ -12,6 +12,7 @@ namespace CHeaderGenerator.CodeWriter
         public string HeaderComment { get; set; }
         public bool IncludeStaticFunctions { get; set; }
         public bool IncludeExternFunctions { get; set; }
+        public CommentPlacement HeaderCommentPlacement { get; set; }
 
         #endregion
 
@@ -21,9 +22,13 @@ namespace CHeaderGenerator.CodeWriter
         {
             using (var writer = new StreamWriter(outStream))
             {
+                if(HeaderCommentPlacement == CommentPlacement.StartOfFile)
+                    WriteHeaderComment(writer, this.HeaderComment);
+
                 using (var includeGuardWriter = new IncludeGuardWriter(writer, this.IncludeGuard))
                 {
-                    WriteHeaderComment(writer, this.HeaderComment);
+                    if(HeaderCommentPlacement == CommentPlacement.InsideIncludeGuard)
+                        WriteHeaderComment(writer, this.HeaderComment);
                     parsedFile.WritePPDefinitions(writer);
                     parsedFile.WriteDeclarations(writer, this.IncludeStaticFunctions, this.IncludeExternFunctions);
                 }

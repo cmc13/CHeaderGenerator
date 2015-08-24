@@ -242,6 +242,7 @@
     <Compile Include="Extensions\MiscExtensions.cs" />
     <Compile Include="Extensions\StringExtensions.cs" />
     <Compile Include="Guids.cs" />
+    <Compile Include="CommentPlacement.cs" />
     <Compile Include="LogLevel.cs" />
     <Compile Include="Parser\BeginCommentDelimiter.cs" />
     <Compile Include="Parser\CommentDelimiters.cs" />
