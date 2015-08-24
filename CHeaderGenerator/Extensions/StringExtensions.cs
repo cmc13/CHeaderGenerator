@@ -1,11 +1,23 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace CHeaderGenerator.Extensions
 {
     static class StringExtensions
     {
+        public static string CaseInsensitiveReplace(this String str, string oldValue, string newValue)
+        {
+            string resultString;
+            try {
+                resultString = Regex.Replace(str, oldValue, newValue, RegexOptions.IgnoreCase);
+            } catch(ArgumentException) {
+                resultString = Regex.Replace(str, Regex.Escape(oldValue), newValue, RegexOptions.IgnoreCase);
+            }
+            return resultString;
+        }
+
         public static bool Contains(this String str, String check, StringComparison comp)
         {
             return str.IndexOf(check, comp) >= 0;

@@ -18,6 +18,17 @@ namespace CHeaderGenerator.Extensions
             return hItems.Select(i => i.Object as ProjectItem);
         }
 
+        public static string GetProjectRelativePath(this Project project, string itemFileName)
+        {
+            string projectPath = project.FullName;
+            if(!string.IsNullOrEmpty(projectPath)) {
+                string projectDir = Path.GetDirectoryName(projectPath);
+                return new Uri(projectDir).MakeRelativeUri(new Uri(itemFileName)).ToString();
+            }
+            
+            return Path.GetFileName(itemFileName);
+        }
+
         public static ProjectItem FindExistingItem(this Project project, string item)
         {
             string localFile = Path.GetFileName(item);
