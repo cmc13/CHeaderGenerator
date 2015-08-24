@@ -222,16 +222,18 @@ namespace CHeaderGenerator
         {
             bool showIncludeGuard;
             bool autoSaveFiles;
+            string baseHeaderComment;
             var codeWriter = new CHeaderFileWriter();
 
             // Add Options
             using (var options = GetDialogPage(typeof(CSourceFileOptions)) as CSourceFileOptions)
             {
-                codeWriter.HeaderComment = SetHeaderComment(options.HeaderComment);
                 codeWriter.IncludeStaticFunctions = options.IncludeStaticFunctions;
                 codeWriter.IncludeExternFunctions = options.IncludeExternFunctions;
+                codeWriter.HeaderCommentPlacement = options.HeaderCommentPlacement;
                 showIncludeGuard = options.ShowIncludeGuard;
                 autoSaveFiles = options.AutoSaveFiles;
+                baseHeaderComment = ProcessHeaderCommentCommonTokens(options);
             }
 
             // Initialize viewmodel to keep track of progress
@@ -260,7 +262,7 @@ namespace CHeaderGenerator
                         // Parse the file
                         log.Info("Processing {0}/{1}: {2}", ++i, projectItems.Count, file);
                         progressVM.Message = string.Format("{0}/{1}: Processing {2}", i, projectItems.Count, file);
-                        if (!ParseItem(file, itemToAdd, codeWriter, showIncludeGuard, projectItem))
+                        if (!ParseItem(file, itemToAdd, codeWriter, showIncludeGuard, baseHeaderComment, projectItem))
                             break;
                         progressVM.ProgressValue = Convert.ToDouble(i);
                     }
@@ -308,10 +310,12 @@ namespace CHeaderGenerator
         /// <param name="headerFileName">The header file to write</param>
         /// <param name="codeWriter">Code writer object</param>
         /// <param name="showIncludeGuard">Whether to surround the header file in an include guard</param>
+        /// <param name="headerComment">The <see cref="CSourceFileOptions.HeaderComment"/> after having been processed with
+        /// <see cref="ProcessHeaderCommentCommonTokens"/></param>
         /// <param name="projectItem">The project item corresponding to the source file</param>
         /// <returns></returns>
         private bool ParseItem(string sourceFileName, string headerFileName,
-            CHeaderFileWriter codeWriter, bool showIncludeGuard, ProjectItem projectItem)
+            CHeaderFileWriter codeWriter, bool showIncludeGuard, string headerComment, ProjectItem projectItem)
         {
             var containingProject = projectItem.ContainingProject;
             var existingItem = containingProject.FindExistingItem(headerFileName);
@@ -330,7 +334,7 @@ namespace CHeaderGenerator
                 CheckOutFile(ApplicationObject.SourceControl, headerFileName);
 
             var c = this.ParseSourceFile(sourceFileName);
-
+            codeWriter.HeaderComment = ProcessHeaderCommentFileTokens(headerComment, containingProject, headerFileName);
             WriteToHeaderFile(showIncludeGuard, codeWriter, headerFileName, c);
 
             // Add File to Project
@@ -405,7 +409,7 @@ namespace CHeaderGenerator
                     Path.GetFileName(headerFileName).ToUpperInvariant()), "_");
             else
                 codeWriter.IncludeGuard = null;
-
+            
             using (var stream = File.Open(headerFileName, FileMode.Create))
             {
                 codeWriter.WriteHeaderFile(c, stream);
@@ -426,21 +430,49 @@ namespace CHeaderGenerator
         }
 
         /// <summary>
-        /// Generate a header comment using the given template, replacing common tokens.
+        /// Generate a header comment using the value in the given options, replacing common tokens.
         /// </summary>
-        /// <param name="template">The template</param>
+        /// <param name="options">The generator's options</param>
         /// <returns>The header comment with tokens replaced by the user's name, company, and date.</returns>
-        private static string SetHeaderComment(string template)
+        private static string ProcessHeaderCommentCommonTokens(CSourceFileOptions options)
+        {
+            string headerComment = options.HeaderComment;
+            
+            if (!string.IsNullOrEmpty(headerComment))
+            {
+                string dateFormat = options.DateFormat;
+                headerComment = headerComment
+                    .CaseInsensitiveReplace("{Name}", GetUserName() ?? "{Name}")
+                    .CaseInsensitiveReplace("{Date}", DateTime.Now.ToString(dateFormat))
+                    .CaseInsensitiveReplace("{Company}", GetCompanyName() ?? "{Company}");
+            } else {
+                headerComment = null;
+            }
+            
+            return headerComment;
+        }
+
+        /// <summary>
+        /// Generate a header comment using the specified string, replacing file tokens.
+        /// </summary>
+        /// <param name="baseHeaderComment"></param>
+        /// <param name="project"></param>
+        /// <param name="headerFileName"></param>
+        /// <returns>The header comment with tokens replaced by the user's name, company, and date.</returns>
+        private static string ProcessHeaderCommentFileTokens(string baseHeaderComment, Project project, string headerFileName)
         {
             string headerComment = null;
-
-            if (!string.IsNullOrEmpty(template))
+            if (baseHeaderComment != null)
             {
-                headerComment = template.Replace("{Name}", GetUserName() ?? "{Name}")
-                    .Replace("{Date}", DateTime.Now.ToString("dd-MMM-yyyy"))
-                    .Replace("{Company}", GetCompanyName() ?? "{Company}");
+                headerComment = baseHeaderComment.CaseInsensitiveReplace(
+                    "{FileName}", Path.GetFileName(headerFileName)
+                );
+                if(baseHeaderComment.Contains("{RelativePath}", StringComparison.InvariantCultureIgnoreCase)) {
+                    string relativePath = project.GetProjectRelativePath(headerFileName);
+                    headerComment = baseHeaderComment.CaseInsensitiveReplace("{RelativePath}", relativePath);
+                }
             }
-
+            
             return headerComment;
         }
 
@@ -460,7 +492,7 @@ namespace CHeaderGenerator
         /// <returns>The current user's name</returns>
         private static string GetUserName()
         {
-            return UserPrincipal.Current.DisplayName;
+            return UserPrincipal.Current.DisplayName ?? Environment.UserName;
         }
 
         #endregion
