@@ -1,8 +1,10 @@
 ﻿using EnvDTE;
 using System;
 using System.Collections.Generic;
+using System.DirectoryServices.AccountManagement;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace CHeaderGenerator.Extensions
 {
@@ -39,6 +41,25 @@ namespace CHeaderGenerator.Extensions
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Gets the company name of the executing assembly.
+        /// </summary>
+        /// <returns>The company name</returns>
+        public static string GetCompanyName()
+        {
+            return ((AssemblyCompanyAttribute)Attribute.GetCustomAttribute(Assembly.GetExecutingAssembly(), typeof(AssemblyCompanyAttribute), false))
+                .Company;
+        }
+
+        /// <summary>
+        /// Gets the current user's name
+        /// </summary>
+        /// <returns>The current user's name</returns>
+        public static string GetUserName()
+        {
+            return UserPrincipal.Current.DisplayName ?? Environment.UserName;
         }
     }
 }

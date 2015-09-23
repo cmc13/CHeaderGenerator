@@ -8,6 +8,7 @@ using CHeaderGenerator.UI.View;
 using CHeaderGenerator.UI.ViewModel;
 using EnvDTE;
 using EnvDTE80;
+using HandlebarsDotNet;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using NLog;
@@ -112,6 +113,8 @@ namespace CHeaderGenerator
 
             this.InitializeLogging();
 
+            InitializeHandlebarsHelpers();
+
             // Add our command handlers for menu (commands must exist in the .vsct file)
             var mcs = GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
             if (null != mcs)
@@ -215,6 +218,42 @@ namespace CHeaderGenerator
         }
 
         /// <summary>
+        /// Initialize helpers for formatting the header comment (using Handlebars syntax)
+        /// </summary>
+        private void InitializeHandlebarsHelpers()
+        {
+            Handlebars.RegisterHelper("formatDate", (tw, obj, parameters) =>
+            {
+                DateTime date = DateTime.Now;
+                string format = null;
+
+                foreach (var param in parameters)
+                {
+                    var fmtString = param as string;
+                    if (!string.IsNullOrEmpty(fmtString))
+                        format = fmtString;
+                    else
+                    {
+                        try
+                        {
+                            DateTime d = (DateTime)param;
+                            date = d;
+                        }
+                        catch
+                        {
+                            // Add additional parameters here
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(format))
+                    tw.Write(date.ToString(format));
+                else
+                    tw.Write(date.ToShortDateString());
+            });
+        }
+
+        /// <summary>
         /// Generate C header files for a list of project items.
         /// </summary>
         /// <param name="projectItems">A list of project items.</param>
@@ -233,7 +272,7 @@ namespace CHeaderGenerator
                 codeWriter.HeaderCommentPlacement = options.HeaderCommentPlacement;
                 showIncludeGuard = options.ShowIncludeGuard;
                 autoSaveFiles = options.AutoSaveFiles;
-                baseHeaderComment = ProcessHeaderCommentCommonTokens(options);
+                baseHeaderComment = options.HeaderComment;
             }
 
             // Initialize viewmodel to keep track of progress
@@ -277,14 +316,14 @@ namespace CHeaderGenerator
                             if (textSelection != null)
                                 textSelection.GotoLine(tex.LineNumber, true);
                         }
-                        log.Error(string.Format("Failed to parse file: {0}", file), tex);
+                        log.Error(tex, string.Format("Failed to parse file: {0}", file));
                         this.ShowExceptionDialog(tex, string.Format("Failed to parse file: {0}", file));
                         error = true;
                     }
                     catch (Exception ex)
                     {
                         // Show a dialog with a less-than-helpful exception message.
-                        log.Error(string.Format("Unknown error while parsing file: {0}", file), ex);
+                        log.Error(ex, string.Format("Unknown error while parsing file: {0}", file));
                         this.ShowExceptionDialog(ex, string.Format("Unknown exception while parsing: {0}", file));
                         error = true;
                     }
@@ -310,12 +349,12 @@ namespace CHeaderGenerator
         /// <param name="headerFileName">The header file to write</param>
         /// <param name="codeWriter">Code writer object</param>
         /// <param name="showIncludeGuard">Whether to surround the header file in an include guard</param>
-        /// <param name="headerComment">The <see cref="CSourceFileOptions.HeaderComment"/> after having been processed with
-        /// <see cref="ProcessHeaderCommentCommonTokens"/></param>
+        /// <param name="headerCommentTemplate">The <see cref="CSourceFileOptions.HeaderComment"/> after having been processed with
+        /// <see cref="ProcessHeaderCommentFileTokens"/></param>
         /// <param name="projectItem">The project item corresponding to the source file</param>
         /// <returns></returns>
         private bool ParseItem(string sourceFileName, string headerFileName,
-            CHeaderFileWriter codeWriter, bool showIncludeGuard, string headerComment, ProjectItem projectItem)
+            CHeaderFileWriter codeWriter, bool showIncludeGuard, string headerCommentTemplate, ProjectItem projectItem)
         {
             var containingProject = projectItem.ContainingProject;
             var existingItem = containingProject.FindExistingItem(headerFileName);
@@ -334,8 +373,8 @@ namespace CHeaderGenerator
                 CheckOutFile(ApplicationObject.SourceControl, headerFileName);
 
             var c = this.ParseSourceFile(sourceFileName);
-            codeWriter.HeaderComment = ProcessHeaderCommentFileTokens(headerComment, containingProject, headerFileName);
-            WriteToHeaderFile(showIncludeGuard, codeWriter, headerFileName, c);
+            var headerComment = ProcessHeaderCommentFileTokens(headerCommentTemplate, containingProject, headerFileName);
+            WriteToHeaderFile(showIncludeGuard, codeWriter, headerFileName, headerComment, c);
 
             // Add File to Project
             if (existingItem == null)
@@ -401,8 +440,10 @@ namespace CHeaderGenerator
         /// <param name="showIncludeGuard">Whether to surround the header file in an include guard</param>
         /// <param name="codeWriter">The code writer object</param>
         /// <param name="headerFileName">The name of the header file to produce</param>
+        /// <param name="headerComment">The comment to write at the beginning of the output file</param>
         /// <param name="c">The parse source file</param>
-        private static void WriteToHeaderFile(bool showIncludeGuard, CHeaderFileWriter codeWriter, string headerFileName, CSourceFile c)
+        private static void WriteToHeaderFile(bool showIncludeGuard, CHeaderFileWriter codeWriter,
+            string headerFileName, string headerComment, CSourceFile c)
         {
             if (showIncludeGuard)
                 codeWriter.IncludeGuard = new Regex(@"[^A-Z0-9_]").Replace(string.Format("__{0}__",
@@ -412,7 +453,7 @@ namespace CHeaderGenerator
             
             using (var stream = File.Open(headerFileName, FileMode.Create))
             {
-                codeWriter.WriteHeaderFile(c, stream);
+                codeWriter.WriteHeaderFile(c, headerComment, stream);
             }
         }
 
@@ -430,29 +471,6 @@ namespace CHeaderGenerator
         }
 
         /// <summary>
-        /// Generate a header comment using the value in the given options, replacing common tokens.
-        /// </summary>
-        /// <param name="options">The generator's options</param>
-        /// <returns>The header comment with tokens replaced by the user's name, company, and date.</returns>
-        private static string ProcessHeaderCommentCommonTokens(CSourceFileOptions options)
-        {
-            string headerComment = options.HeaderComment;
-            
-            if (!string.IsNullOrEmpty(headerComment))
-            {
-                string dateFormat = options.DateFormat;
-                headerComment = headerComment
-                    .CaseInsensitiveReplace("{Name}", GetUserName() ?? "{Name}")
-                    .CaseInsensitiveReplace("{Date}", DateTime.Now.ToString(dateFormat))
-                    .CaseInsensitiveReplace("{Company}", GetCompanyName() ?? "{Company}");
-            } else {
-                headerComment = null;
-            }
-            
-            return headerComment;
-        }
-
-        /// <summary>
         /// Generate a header comment using the specified string, replacing file tokens.
         /// </summary>
         /// <param name="baseHeaderComment"></param>
@@ -464,35 +482,19 @@ namespace CHeaderGenerator
             string headerComment = null;
             if (baseHeaderComment != null)
             {
-                headerComment = baseHeaderComment.CaseInsensitiveReplace(
-                    "{FileName}", Path.GetFileName(headerFileName)
-                );
-                if(baseHeaderComment.Contains("{RelativePath}", StringComparison.InvariantCultureIgnoreCase)) {
-                    string relativePath = project.GetProjectRelativePath(headerFileName);
-                    headerComment = baseHeaderComment.CaseInsensitiveReplace("{RelativePath}", relativePath);
-                }
+                var template = Handlebars.Compile(baseHeaderComment);
+
+                headerComment = template(new
+                {
+                    Name = MiscExtensions.GetUserName(),
+                    Date = DateTime.Now,
+                    Company = MiscExtensions.GetCompanyName(),
+                    FileName = Path.GetFileName(headerFileName),
+                    RelativePath = project.GetProjectRelativePath(headerFileName)
+                });
             }
             
             return headerComment;
-        }
-
-        /// <summary>
-        /// Gets the company name of the executing assembly.
-        /// </summary>
-        /// <returns>The company name</returns>
-        private static string GetCompanyName()
-        {
-            return ((AssemblyCompanyAttribute)Attribute.GetCustomAttribute(Assembly.GetExecutingAssembly(), typeof(AssemblyCompanyAttribute), false))
-                .Company;
-        }
-
-        /// <summary>
-        /// Gets the current user's name
-        /// </summary>
-        /// <returns>The current user's name</returns>
-        private static string GetUserName()
-        {
-            return UserPrincipal.Current.DisplayName ?? Environment.UserName;
         }
 
         #endregion

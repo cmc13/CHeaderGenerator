@@ -92,7 +92,7 @@ namespace CHeaderGenerator.Parser.C
                         messageBuilder.AppendFormat(" The error occurred at position {0} on line {1}.", token.PositionInLine, token.LineNumber);
 
                     string message = messageBuilder.ToString();
-                    log.Error(message, ex);
+                    log.Error(ex, message);
                     if (token != null)
                         throw new ParserException(message, ex, token.PositionInLine, token.LineNumber);
                     else
