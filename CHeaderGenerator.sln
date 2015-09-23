@@ -1,20 +1,20 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.30501.0
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CHeaderGenerator", "CHeaderGenerator\CHeaderGenerator.csproj", "{BA67492B-E42D-4694-9681-E3D766FA2DEB}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CHeaderGeneratorTests", "CHeaderGeneratorTests\CHeaderGeneratorTests.csproj", "{63DB1F7C-E88D-4202-8AA4-357DE71C6F16}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NLog.Targets.Custom", "NLog.Targets\NLog.Targets.Custom.csproj", "{2EB7EF03-18C0-46A8-9B75-166279660146}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{3E680D40-3ED7-4BAA-9A6C-C0553C751308}"
 	ProjectSection(SolutionItems) = preProject
 		.nuget\NuGet.Config = .nuget\NuGet.Config
 		.nuget\NuGet.exe = .nuget\NuGet.exe
 		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CHeaderGenerator", "CHeaderGenerator\CHeaderGenerator.csproj", "{BA67492B-E42D-4694-9681-E3D766FA2DEB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CHeaderGeneratorTests", "CHeaderGeneratorTests\CHeaderGeneratorTests.csproj", "{63DB1F7C-E88D-4202-8AA4-357DE71C6F16}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NLog.Targets.Custom", "NLog.Targets\NLog.Targets.Custom.csproj", "{2EB7EF03-18C0-46A8-9B75-166279660146}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
