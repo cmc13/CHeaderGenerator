@@ -9,21 +9,25 @@ namespace CHeaderGenerator.CodeWriter
         #region Public Property Definitions
 
         public string IncludeGuard { get; set; }
-        public string HeaderComment { get; set; }
         public bool IncludeStaticFunctions { get; set; }
         public bool IncludeExternFunctions { get; set; }
+        public CommentPlacement HeaderCommentPlacement { get; set; }
 
         #endregion
 
         #region Public Function Definitions
 
-        public void WriteHeaderFile(CSourceFile parsedFile, Stream outStream)
+        public void WriteHeaderFile(CSourceFile parsedFile, string headerComment, Stream outStream)
         {
             using (var writer = new StreamWriter(outStream))
             {
+                if(HeaderCommentPlacement == CommentPlacement.StartOfFile)
+                    WriteHeaderComment(writer, headerComment);
+
                 using (var includeGuardWriter = new IncludeGuardWriter(writer, this.IncludeGuard))
                 {
-                    WriteHeaderComment(writer, this.HeaderComment);
+                    if(HeaderCommentPlacement == CommentPlacement.InsideIncludeGuard)
+                        WriteHeaderComment(writer, headerComment);
                     parsedFile.WritePPDefinitions(writer);
                     parsedFile.WriteDeclarations(writer, this.IncludeStaticFunctions, this.IncludeExternFunctions);
                 }

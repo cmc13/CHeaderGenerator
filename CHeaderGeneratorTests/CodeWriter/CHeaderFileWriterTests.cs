@@ -27,11 +27,11 @@ namespace CHeaderGeneratorTests.CodeWriter
         [TestMethod]
         public void TestWritingHeaderComment()
         {
-            var writer = new CHeaderFileWriter() { HeaderComment = "test" };
+            var writer = new CHeaderFileWriter();
 
             using (var stream = new MemoryStream())
             {
-                writer.WriteHeaderFile(new CSourceFile(), stream);
+                writer.WriteHeaderFile(new CSourceFile(), "test", stream);
                 var bytes = stream.ToArray();
                 var str = Encoding.ASCII.GetString(bytes);
 
@@ -46,11 +46,39 @@ namespace CHeaderGeneratorTests.CodeWriter
 
             using (var stream = new MemoryStream())
             {
-                writer.WriteHeaderFile(new CSourceFile(), stream);
+                writer.WriteHeaderFile(new CSourceFile(), null, stream);
                 var bytes = stream.ToArray();
                 var str = Encoding.ASCII.GetString(bytes);
 
                 Assert.That(str, Is.Not.Null.And.EqualTo("#ifndef test\r\n#define test\r\n\r\n\r\n#endif\r\n"));
+            }
+        }
+
+        [TestMethod]
+        public void TestWritingHeaderCommentInsideIncludeGuard()
+        {
+            var writer = new CHeaderFileWriter() { IncludeGuard = "test", HeaderCommentPlacement = CHeaderGenerator.CommentPlacement.InsideIncludeGuard };
+            using (var stream = new MemoryStream())
+            {
+                writer.WriteHeaderFile(new CSourceFile(), "test", stream);
+                var bytes = stream.ToArray();
+                var str = Encoding.ASCII.GetString(bytes);
+
+                Assert.That(str, Is.Not.Null.And.EqualTo("#ifndef test\r\n#define test\r\n\r\ntest\r\n\r\n\r\n#endif\r\n"));
+            }
+        }
+
+        [TestMethod]
+        public void TestWritingHeaderCommentAtStartOfFile()
+        {
+            var writer = new CHeaderFileWriter() { IncludeGuard = "test", HeaderCommentPlacement = CHeaderGenerator.CommentPlacement.StartOfFile };
+            using (var stream = new MemoryStream())
+            {
+                writer.WriteHeaderFile(new CSourceFile(), "test", stream);
+                var bytes = stream.ToArray();
+                var str = Encoding.ASCII.GetString(bytes);
+
+                Assert.That(str, Is.Not.Null.And.EqualTo("test\r\n\r\n#ifndef test\r\n#define test\r\n\r\n\r\n#endif\r\n"));
             }
         }
     }
