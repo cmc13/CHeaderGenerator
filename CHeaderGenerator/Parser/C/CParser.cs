@@ -212,7 +212,7 @@ namespace CHeaderGenerator.Parser.C
         private Token<CTokenType> ParseInitDeclarator(Token<CTokenType> firstToken, out Declarator decl)
         {
             decl = new Declarator();
-            this.ParseDeclarator(firstToken, decl);
+            this.ParseDeclarator(firstToken, decl, false);
 
             Token<CTokenType> token = this.lexer.GetNextToken();
             if (token != null)
@@ -228,7 +228,7 @@ namespace CHeaderGenerator.Parser.C
             return token;
         }
 
-        private void ParseDeclarator(Token<CTokenType> firstToken, Declarator declarator)
+        private void ParseDeclarator(Token<CTokenType> firstToken, Declarator declarator, bool canBeAbstract)
         {
             log.Trace("Attempting to parse declarator at position {0} on line {1}", firstToken.PositionInLine, firstToken.LineNumber);
 
@@ -240,7 +240,16 @@ namespace CHeaderGenerator.Parser.C
                     copyToken.PositionInLine, copyToken.LineNumber);
                 throw new InvalidTokenException("Invalid pointer declaration", copyToken);
             }
-            declarator.DirectDeclarator = this.ParseDirectDeclarator(firstToken);
+            else if (firstToken.Type != CTokenType.PUNCTUATOR || !firstToken.Value.Equals(")"))
+                declarator.DirectDeclarator = this.ParseDirectDeclarator(firstToken, canBeAbstract);
+            else if (!canBeAbstract)
+            {
+                log.Trace("Invalid abstract declarator encountered at position {0} on line {1}",
+                    copyToken.PositionInLine, copyToken.LineNumber);
+                throw new InvalidTokenException("Invalid abstract declarator", copyToken);
+            }
+            else
+                this.lexer.PushToken(firstToken);
         }
 
         private Pointer ParsePointer(ref Token<CTokenType> token)
@@ -277,7 +286,7 @@ namespace CHeaderGenerator.Parser.C
             return pointer;
         }
 
-        private DirectDeclarator ParseDirectDeclarator(Token<CTokenType> token)
+        private DirectDeclarator ParseDirectDeclarator(Token<CTokenType> token, bool canBeAbstract)
         {
             DirectDeclarator decl = null;
 
@@ -294,73 +303,7 @@ namespace CHeaderGenerator.Parser.C
 
                     case CTokenType.PUNCTUATOR:
                         if (token.Value.Equals("("))
-                        {
-                            var tokenStack = new Stack<Token<CTokenType>>();
-                            Token<CTokenType> peekToken = this.lexer.GetNextToken();
-                            tokenStack.Push(peekToken);
-                            int parenCount = 1;
-                            bool isParamList = false;
-                            int symbolCount = 0;
-                            while (peekToken != null && parenCount > 0 && !isParamList)
-                            {
-                                if (peekToken.Type == CTokenType.PUNCTUATOR)
-                                {
-                                    if (peekToken.Value.Equals(")"))
-                                        parenCount--;
-                                    else if (peekToken.Value.Equals("("))
-                                        parenCount++;
-                                    else if (peekToken.Value.Equals(",")
-                                        && parenCount == 1)
-                                        isParamList = true;
-                                    else
-                                    {
-                                        peekToken = this.lexer.GetNextToken();
-                                        tokenStack.Push(peekToken);
-                                    }
-                                }
-                                else if (peekToken.Type == CTokenType.KEYWORD
-                                    || peekToken.Type == CTokenType.TYPE_SPECIFIER
-                                    || peekToken.Type == CTokenType.ENUM_SPECIFIER
-                                    || peekToken.Type == CTokenType.STRUCTURE_SPECIFIER)
-                                    isParamList = true;
-                                else if (peekToken.Type == CTokenType.SYMBOL)
-                                {
-                                    if (symbolCount > 0)
-                                        isParamList = true;
-                                    else
-                                        symbolCount++;
-                                }
-                                else
-                                {
-                                    peekToken = this.lexer.GetNextToken();
-                                    tokenStack.Push(peekToken);
-                                }
-                            }
-
-                            if (parenCount == 0 && symbolCount == 0)
-                                isParamList = true;
-
-                            while (tokenStack.Count > 0)
-                                this.lexer.PushToken(tokenStack.Pop());
-
-                            if (isParamList)
-                                decl = this.ParseFunctionDeclarator(ref token, null);
-                            else
-                                decl = ParseParenthesizedDeclarator(token, decl);
-                        }
-                        else if (token.Value.Equals("["))
-                        {
-                            var arrayDecl = new ArrayDeclarator();
-                            arrayDecl.ArraySizeExpression = ParseConstantExpression(token, "]");
-                            decl = arrayDecl;
-                        }
-                        else if (token.Value.Equals(","))
-                        {
-                            this.lexer.PushToken(token);
-                            return decl;
-                        }
-                        else
-                            this.lexer.PushToken(token);
+                            decl = this.ParseParenthesizedDeclarator(token, canBeAbstract);
                         break;
 
                     default:
@@ -409,19 +352,17 @@ namespace CHeaderGenerator.Parser.C
             return decl;
         }
 
-        private DirectDeclarator ParseParenthesizedDeclarator(Token<CTokenType> token, DirectDeclarator decl)
+        private DirectDeclarator ParseParenthesizedDeclarator(Token<CTokenType> token, bool canBeAbstract)
         {
             var parenthesizedDecl = new ParenthesizedDeclarator { Declarator = new Declarator() };
             Token<CTokenType> nextToken = this.lexer.GetNextToken();
             if (nextToken != null)
-                this.ParseDeclarator(nextToken, parenthesizedDecl.Declarator);
+                this.ParseDeclarator(nextToken, parenthesizedDecl.Declarator, canBeAbstract);
             else
             {
                 log.Trace("Unfinished parenthesized declarator encountered at position {0} on line {1}", token.PositionInLine, token.LineNumber);
                 throw new InvalidTokenException("Unfinished parenthesized declarator", token);
             }
-
-            decl = parenthesizedDecl;
 
             var endToken = this.lexer.GetNextToken();
             if (endToken != null)
@@ -439,7 +380,7 @@ namespace CHeaderGenerator.Parser.C
                     token.PositionInLine, token.LineNumber);
                 throw new InvalidTokenException("Incomplete declarator", token);
             }
-            return decl;
+            return parenthesizedDecl;
         }
 
         private DirectDeclarator ParseFunctionDeclarator(ref Token<CTokenType> token, DirectDeclarator decl)
@@ -850,7 +791,7 @@ namespace CHeaderGenerator.Parser.C
         private Token<CTokenType> ParseParameterDeclarator(Token<CTokenType> token, out BaseDeclarator baseDeclarator)
         {
             var decl = new Declarator();
-            this.ParseDeclarator(token, decl);
+            this.ParseDeclarator(token, decl, true);
             baseDeclarator = decl;
 
             return this.lexer.GetNextToken();
@@ -1244,7 +1185,7 @@ namespace CHeaderGenerator.Parser.C
                 else
                 {
                     structDecl.Declarator = new Declarator();
-                    this.ParseDeclarator(token, structDecl.Declarator);
+                    this.ParseDeclarator(token, structDecl.Declarator, false);
 
                     token = this.lexer.GetNextToken();
                     if (token != null)

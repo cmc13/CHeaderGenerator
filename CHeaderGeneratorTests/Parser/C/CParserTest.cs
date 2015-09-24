@@ -688,5 +688,59 @@ namespace CHeaderGeneratorTests.Parser.C
 
             Assert.That(() => p.PerformParse(), Throws.TypeOf(typeof(ParserException)));
         }
+
+        [TestMethod]
+        public void TestParsingFunctionPointerTypedef()
+        {
+            Stack<Token<CTokenType>> tokens = new Stack<Token<CTokenType>>();
+
+            var m = SetupMock(tokens);
+
+            tokens.Push(GenerateToken(CTokenType.TERMINATOR, ";"));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, ")"));
+            tokens.Push(GenerateToken(CTokenType.SYMBOL, "adf"));
+            tokens.Push(GenerateToken(CTokenType.TYPE_SPECIFIER, "int"));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, "("));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, ")"));
+            tokens.Push(GenerateToken(CTokenType.SYMBOL, "test"));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, "*"));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, "("));
+            tokens.Push(GenerateToken(CTokenType.TYPE_SPECIFIER, "void"));
+            tokens.Push(GenerateToken(CTokenType.KEYWORD, "typedef"));
+
+            var p = new CParser(m.Object);
+            var sf = p.PerformParse();
+
+            Assert.That(sf.DeclarationList.Count, Is.EqualTo(1));
+
+            var decl = sf.DeclarationList.First();
+            Assert.That(decl.DeclarationSpecifiers.TypeSpecifier.TypeName, Is.EqualTo("void"));
+            Assert.That(decl.DeclarationSpecifiers.StorageClass, Is.EqualTo(StorageClass.Typedef));
+        }
+
+        [TestMethod]
+        public void TestParsingFunctionWithFunctionPointerArgument()
+        {
+            Stack<Token<CTokenType>> tokens = new Stack<Token<CTokenType>>();
+
+            var m = SetupMock(tokens);
+
+            tokens.Push(GenerateToken(CTokenType.TERMINATOR, ";"));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, ")"));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, ")"));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, "("));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, ")"));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, "*"));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, "("));
+            tokens.Push(GenerateToken(CTokenType.TYPE_SPECIFIER, "int"));
+            tokens.Push(GenerateToken(CTokenType.PUNCTUATOR, "("));
+            tokens.Push(GenerateToken(CTokenType.SYMBOL, "test"));
+            tokens.Push(GenerateToken(CTokenType.TYPE_SPECIFIER, "int"));
+
+            var p = new CParser(m.Object);
+            var sf = p.PerformParse();
+
+            Assert.That(sf.DeclarationList.Count, Is.EqualTo(1));
+        }
     }
 }
